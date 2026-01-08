@@ -1,0 +1,21 @@
+table_name: files
+fields:
+  - name: idFile
+    type: int
+    length: 4
+    primary_key: true
+  - name: idPath
+    type: int
+    length: 4
+  - name: strFilename
+    type: varchar
+    length: var
+  - name: playCount
+    type: int
+    length: 4
+  - name: lastPlayed
+    type: varchar
+    length: var
+  - name: dateAdded
+    type: varchar
+    length: var
