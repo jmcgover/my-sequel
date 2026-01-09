@@ -11,6 +11,7 @@
 # jmcgover-ibd-parser = { git = "https://github.com/jmcgover/ibd-parser" }
 # ///
 
+import csv
 import json
 import pathlib
 from pprint import pprint
@@ -19,7 +20,6 @@ import click
 from ibd_parser import IBDFileParser
 from tabulate import tabulate
 import yaml
-import csv
 
 
 def load_schema(schema_path: pathlib.Path) -> dict:
@@ -142,7 +142,7 @@ def main(
             fieldnames.update(d.keys())
         print(f"{sorted(fieldnames)=}")
         print(f"Saving to {this_out_path!s}...")
-        with this_out_path.open('w') as file:
+        with this_out_path.open("w") as file:
             writer = csv.DictWriter(file, fieldnames=sorted(fieldnames))
             writer.writeheader()
             for d in parsed:
