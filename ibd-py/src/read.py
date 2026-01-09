@@ -19,6 +19,7 @@ import click
 from ibd_parser import IBDFileParser
 from tabulate import tabulate
 import yaml
+import csv
 
 
 def load_schema(schema_path: pathlib.Path) -> dict:
@@ -53,7 +54,18 @@ def format_mysql_style(records, headers):
     "ibd_path",
     type=click.Path(
         file_okay=True,
+        readable=True,
         dir_okay=False,
+        path_type=pathlib.Path,
+    ),
+    required=True,
+    help="path to IBD file",
+)
+@click.option(
+    "-o",
+    "--outfile",
+    "out_path",
+    type=click.Path(
         path_type=pathlib.Path,
     ),
     required=True,
@@ -81,6 +93,7 @@ def main(
     ibd_path: pathlib.Path,
     schema_path: pathlib.Path,
     page_no: int,
+    out_path: pathlib.Path,
 ):
     # Parse schema file
     schema = load_schema(schema_path)
@@ -114,7 +127,31 @@ def main(
 
     print(json.dumps(result, indent=2, sort_keys=True, default=str))
 
-    return
+    print("=" * 10 + "Parseable:")
+    parsed = []
+    for r in result.get("records", []):
+        if r.data:
+            print(json.dumps(r.data, indent=2, sort_keys=True, default=str))
+            parsed.append(r.data)
+
+    if len(parsed) > 0:
+        print(f"Parsed this many records: {len(parsed):,}")
+        this_out_path = out_path.with_stem(f"{out_path.stem}_{page_no:03}")
+        fieldnames: set[str] = set()
+        for d in parsed:
+            fieldnames.update(d.keys())
+        print(f"{sorted(fieldnames)=}")
+        print(f"Saving to {this_out_path!s}...")
+        with this_out_path.open('w') as file:
+            writer = csv.DictWriter(file, fieldnames=sorted(fieldnames))
+            writer.writeheader()
+            for d in parsed:
+                writer.writerow(d)
+
+    else:
+        print(f"Parsed ZERO records")
+
+    return 0
 
 
 if __name__ == "__main__":
