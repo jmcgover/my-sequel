@@ -7,8 +7,10 @@
 # ]
 # ///
 
+from collections import defaultdict
 import csv
 import datetime as dt
+import json
 import pathlib
 import sqlite3
 import sys
@@ -87,7 +89,25 @@ def main(
     logger.info(f"Successfully parsed {len(rows)=:,}")
     if len(failed_rows) > 0:
         logger.error(f"Failed to parse {len(failed_rows)=:,}")
-    print(f"SELECT COUNT(DISTINCT f.idFile) FROM files f WHERE f.strFilename IN (\"{'", "'.join({r.str_filename for r in rows})}\");")
+    print(
+        f"SELECT COUNT(DISTINCT f.idFile) FROM files f WHERE f.strFilename IN (\"{'", "'.join({r.str_filename for r in rows})}\");"
+    )
+
+    logger.info("Checking for duplicates...")
+    path_to_rows: dict[str, list[FileRow]] = defaultdict(list)
+    for r in rows:
+        path_to_rows[r.str_filename].append(r)
+
+    num_duped_paths: int = 0
+    for str_filename, instances in path_to_rows.items():
+        if len(instances) > 1:
+            logger.warning(f"Found duplicates for {str_filename=}: {len(instances)}")
+            print(json.dumps([i.model_dump(mode="json") for i in instances], indent=2), file=sys.stderr)
+            num_duped_paths += 1
+
+    logger.info("Checking for duplicates...DONE")
+    if num_duped_paths > 0:
+        logger.error(f"Found {num_duped_paths=}")
     return 0
 
 
