@@ -14,6 +14,7 @@ import json
 import pathlib
 import sqlite3
 import sys
+from typing import Self
 
 import click
 from loguru import logger
@@ -32,6 +33,35 @@ class FileRow(BaseModel):
     play_count: int
     last_played: dt.datetime
     date_added: dt.datetime
+
+
+class FileRowUpdate(BaseModel):
+    """Entry in the files table for Kodi."""
+
+    model_config = ConfigDict(alias_generator=to_camel)
+
+    str_filename: str
+    play_count: int
+    last_played: dt.datetime
+
+    def update_sql(
+        self,
+    ) -> str:
+        return 'UPDATE files\n  SET\n    lastPlayed="{last_played}",\n    playCount={play_count}\n  WHERE\n    strFilename="{str_filename}"\n;'.format(
+            last_played=self.last_played.strftime("%Y-%m-%d %H:%M:%S"),
+            play_count=self.play_count,
+            str_filename=self.str_filename,
+        )
+
+    @classmethod
+    def from_rows(cls, rows: list[FileRow]) -> Self:
+        str_filenames = {r.str_filename for r in rows}
+        assert len(str_filenames) == 1
+        return cls(
+            strFilename=str_filenames.pop(),
+            playCount=sum([r.play_count for r in rows]),
+            lastPlayed=max([r.last_played for r in rows]),
+        )
 
 
 @click.command(
@@ -98,16 +128,32 @@ def main(
     for r in rows:
         path_to_rows[r.str_filename].append(r)
 
+    update_infos: dict[str, FileRowUpdate] = {}
     num_duped_paths: int = 0
     for str_filename, instances in path_to_rows.items():
         if len(instances) > 1:
             logger.warning(f"Found duplicates for {str_filename=}: {len(instances)}")
             print(json.dumps([i.model_dump(mode="json") for i in instances], indent=2), file=sys.stderr)
             num_duped_paths += 1
+        update_infos[str_filename] = FileRowUpdate.from_rows(instances)
 
     logger.info("Checking for duplicates...DONE")
+    logger.info(f"Total rows: {len(rows):,}")
     if num_duped_paths > 0:
-        logger.error(f"Found {num_duped_paths=}")
+        logger.error(f"Duped Paths: {num_duped_paths:,}")
+    logger.info(f"Updates to make: {len(update_infos):,}")
+
+    for str_filename, update in update_infos.items():
+        assert str_filename == update.str_filename
+        logger.info(
+            f"{update.str_filename=}, {update.last_played.strftime("%Y-%m-%d %H:%M:%S")=}, {update.play_count=}"
+        )
+        sql_script_path = pathlib.Path.cwd().joinpath("sql", str_filename).with_suffix(".sql")
+        logger.info(f"Saving SQL to {sql_script_path!s}...")
+        with sql_script_path.open("w") as file:
+            print(update.update_sql(), file=file)
+        logger.info(f"Saving SQL to {sql_script_path!s}...DONE")
+
     return 0
 
 
