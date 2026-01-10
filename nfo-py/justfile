@@ -1,0 +1,42 @@
+set positional-arguments := true
+
+# list targets and exit
+default:
+    just --list
+
+# install python deps (with poetry)
+install:
+    poetry install
+
+# update python deps (using poetry)
+update:
+    poetry update
+
+# add deps (or upgrade to latest if they're already installed)
+add-deps:
+    poetry add --group=dev rust-just@latest uv@latest black@latest isort@latest mypy@latest pyclean@latest
+
+# format python code
+format:
+    poetry run isort .
+    poetry run black .
+
+# lint python code docstrings
+lint-doc:
+    poetry run uvx --with-requirements src/nfo.py pydocstyle --verbose --source --explain .
+
+# typecheck python code
+types:
+    poetry run uvx --with-requirements src/nfo.py mypy .
+
+# clean up all the nonsense
+clean:
+    poetry run pyclean . --debris=all --verbose
+
+# format justfile using just's fmt feature
+format-justfile:
+    just --fmt --unstable
+
+# run the script that reads an IBD file
+run *args="--help":
+    poetry run uv run src/nfo.py {{ args }}
